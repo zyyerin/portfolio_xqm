@@ -16,13 +16,23 @@ const XiaohongshuIcon = () => (
 const Footer = () => {
   return (
     <footer className="py-8 px-6 md:px-48 flex justify-between items-center text-sm">
-      <p>© {new Date().getFullYear()} Qiming Xie</p>
-      <div className="flex gap-6 items-center">
-        <a href="https://www.xiaohongshu.com/user/profile/dylannnxie" className="hover:opacity-70 flex items-center gap-2">
-          <XiaohongshuIcon /> REDBOOK
+      <p className="whitespace-nowrap">© {new Date().getFullYear()} Qiming Xie</p>
+      <div className="flex gap-4 md:gap-6 items-center">
+        <a 
+          href="https://www.xiaohongshu.com/user/profile/dylannnxie" 
+          className="hover:opacity-70 flex items-center gap-2"
+          aria-label="Redbook"
+        >
+          <XiaohongshuIcon /> 
+          <span className="hidden md:inline">REDBOOK</span>
         </a>
-        <a href="https://instagram.com" className="hover:opacity-70 flex items-center gap-2">
-          <Instagram size={16} /> INSTAGRAM
+        <a 
+          href="https://instagram.com" 
+          className="hover:opacity-70 flex items-center gap-2"
+          aria-label="Instagram"
+        >
+          <Instagram size={16} /> 
+          <span className="hidden md:inline">INSTAGRAM</span>
         </a>
       </div>
     </footer>

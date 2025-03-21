@@ -26,6 +26,25 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // 检测设备是否为移动设备
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // 小于768px视为移动设备
+    };
+    
+    // 初始检查
+    checkMobile();
+    
+    // 监听窗口大小变化
+    window.addEventListener('resize', checkMobile);
+    
+    // 清理函数
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   // 预加载图片并计算比例
   useEffect(() => {
@@ -56,7 +75,9 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
       setLoading(false);
     };
     
-    loadImageDimensions();
+    if (images.length > 0) {
+      loadImageDimensions();
+    }
   }, [images]);
 
   // 获取图片尺寸
@@ -111,8 +132,11 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
     };
   };
 
-  // 打开灯箱
+  // 打开灯箱 - 仅在非移动设备上启用
   const openLightbox = (index: number) => {
+    // 如果是移动设备，不打开灯箱
+    if (isMobile) return;
+    
     setCurrentImageIndex(index);
     setLightboxOpen(true);
     document.body.style.overflow = 'hidden'; // 防止背景滚动
@@ -225,10 +249,12 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
     };
   }, []);
 
-  const breakpointColumns = {
+  // 根据屏幕大小调整瀑布流的列数
+  const breakpointColumnsObj = {
     default: 3,
-    1024: 2,
-    768: 1
+    1100: 3,
+    700: 2,
+    500: 1
   };
 
   if (loading) {
@@ -243,30 +269,25 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
 
   return (
     <>
+      {/* 瀑布流画廊 */}
       <Masonry
-        breakpointCols={breakpointColumns}
-        className="flex -ml-4 w-auto"
-        columnClassName="pl-4 bg-clip-padding"
+        breakpointCols={breakpointColumnsObj}
+        className="flex w-full gap-4"
+        columnClassName="flex flex-col gap-4"
       >
         {processedImages.map((image, index) => (
-          <motion.div
-            key={index}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: index * 0.1 }}
-            className="mb-4"
+          <div 
+            key={index} 
+            className={`overflow-hidden cursor-pointer`}
+            onClick={() => openLightbox(index)}
           >
-            <div
-              className="relative cursor-pointer overflow-hidden"
-              onClick={() => openLightbox(index)}
-            >
-              <LazyImage
-                src={image.url}
-                alt={`Gallery image ${index + 1}`}
-                className="w-full h-auto transition-transform duration-300 hover:scale-125"
-              />
-            </div>
-          </motion.div>
+            {/* LazyImage组件用于延迟加载 */}
+            <LazyImage
+              src={image.url}
+              alt={`Gallery image ${index}`}
+              className="w-full h-auto hover:scale-105 transition-transform duration-300"
+            />
+          </div>
         ))}
       </Masonry>
 
@@ -277,41 +298,48 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+            className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center"
             onClick={closeLightbox}
           >
-            <button
-              className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
+            {/* 灯箱关闭按钮 */}
+            <button 
+              className="absolute top-4 right-4 text-white p-2 z-10"
               onClick={closeLightbox}
             >
-              <X size={32} />
+              <X size={24} />
             </button>
-            <button
-              className="absolute left-4 text-white hover:text-gray-300 transition-colors"
-              onClick={goToPreviousImage}
-              disabled={isAnimating}
+            
+            {/* 导航按钮 */}
+            <button 
+              className="absolute left-4 text-white p-2 z-10"
+              onClick={(e) => {
+                e.stopPropagation();
+                goToPreviousImage();
+              }}
             >
-              <ChevronLeft size={48} />
+              <ChevronLeft size={40} />
             </button>
-            <motion.img
-              key={currentImageIndex}
-              src={images[currentImageIndex].url}
-              alt={`Lightbox image ${currentImageIndex + 1}`}
-              className="max-h-[90vh] max-w-[90vw] object-contain"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            />
-            <button
-              className="absolute right-4 text-white hover:text-gray-300 transition-colors"
-              onClick={goToNextImage}
-              disabled={isAnimating}
+            
+            <button 
+              className="absolute right-4 text-white p-2 z-10"
+              onClick={(e) => {
+                e.stopPropagation();
+                goToNextImage();
+              }}
             >
-              <ChevronRight size={48} />
+              <ChevronRight size={40} />
             </button>
-            <div className="absolute bottom-4 text-white bg-black/50 px-3 py-1 rounded-full text-sm">
-              {currentImageIndex + 1} / {images.length}
+            
+            {/* 灯箱图片 */}
+            <div 
+              className="relative w-full h-full flex items-center justify-center p-4 md:p-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img 
+                src={images[currentImageIndex].url} 
+                alt={`Lightbox image ${currentImageIndex}`}
+                className="max-w-full max-h-full object-contain"
+              />
             </div>
           </motion.div>
         )}
