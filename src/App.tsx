@@ -9,6 +9,9 @@ import ProjectDetail from './components/ProjectDetail';
 import Footer from './components/Footer';
 import PageTransition from './components/PageTransition';
 
+// 获取基础路径配置 - 与vite.config.ts中的base配置保持一致
+const base = import.meta.env.BASE_URL;
+
 function AnimatedRoutes() {
   const location = useLocation();
 
@@ -42,7 +45,7 @@ function AnimatedRoutes() {
 
 function App() {
   return (
-    <Router>
+    <Router basename={base}>
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-grow">
