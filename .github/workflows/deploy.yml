@@ -41,6 +41,9 @@ jobs:
       - name: 复制404.html到dist
         run: cp -f public/404.html dist/404.html
       
+      - name: 复制CNAME文件到dist
+        run: cp -f CNAME dist/CNAME
+      
       - name: 设置 Pages
         uses: actions/configure-pages@v4
       
