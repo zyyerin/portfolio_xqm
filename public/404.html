@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>重定向中...</title>
+  <script>
+    // 仓库名称应与 vite.config.ts 中的 base 保持一致
+    var segmentCount = 1; // 如果是用户页面使用 0
+    var repoName = "portfolio_xqm"; // 你的仓库名称
+    
+    var l = window.location;
+    var basePath = l.pathname.split('/').slice(0, 1 + segmentCount).join('/') + '/';
+    
+    // 重定向到index.html，并保留查询参数和哈希
+    l.replace(
+      l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+      basePath +
+      l.pathname.slice(basePath.length) + '?' +
+      (l.search ? l.search.slice(1) + '&' : '') +
+      'p=' + encodeURIComponent(l.pathname.slice(basePath.length)) +
+      (l.hash || '')
+    );
+  </script>
+</head>
+<body>
+  <p>页面加载中...</p>
+</body>
+</html> 
