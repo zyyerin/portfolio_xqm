@@ -15,7 +15,7 @@ const XiaohongshuIcon = () => (
 
 const Footer = () => {
   return (
-    <footer className="py-8 px-6 md:px-48 flex justify-between items-center text-sm">
+    <footer className="py-8 px-3 sm:px-4 md:px-6 lg:px-48 flex justify-between items-center text-sm">
       <p className="whitespace-nowrap">© {new Date().getFullYear()} Qiming Xie</p>
       <div className="flex gap-4 md:gap-6 items-center">
         <a 

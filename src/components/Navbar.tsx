@@ -68,7 +68,7 @@ const Navbar = () => {
           isScrolled ? 'bg-white shadow-sm' : 'bg-white/80 backdrop-blur-sm'
         }`}
       >
-        <div className="h-full flex justify-between items-center px-6 md:px-48">
+        <div className="h-full flex justify-between items-center px-3 sm:px-4 md:px-6 lg:px-48">
           {/* Logo */}
           <Link to="/" className="text-xl font-light tracking-wider hover:opacity-70 transition-opacity">
             QIMING XIE

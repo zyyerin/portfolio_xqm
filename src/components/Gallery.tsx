@@ -271,13 +271,13 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
       {/* 瀑布流画廊 */}
       <Masonry
         breakpointCols={breakpointColumnsObj}
-        className="flex w-auto"
-        columnClassName="pl-0 md:pl-2 bg-clip-padding"
+        className="flex w-auto -ml-2 sm:-ml-3 md:-ml-4"
+        columnClassName="pl-2 sm:pl-3 md:pl-4 bg-clip-padding"
       >
         {processedImages.map((image, index) => (
           <div
             key={index}
-            className="mb-2 sm:mb-3 md:mb-4 px-1 md:px-2 animate-fadeIn"
+            className="mb-2 sm:mb-3 md:mb-4 animate-fadeIn"
             style={{
               animationDelay: `${index * 0.05}s`,
               animationDuration: '0.5s'
