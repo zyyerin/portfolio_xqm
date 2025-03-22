@@ -249,20 +249,19 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
     };
   }, []);
 
-  // 根据屏幕大小调整瀑布流的列数
+  // Masonry布局配置和断点 - 调整以适应不同屏幕大小
   const breakpointColumnsObj = {
-    default: 3,
-    1100: 3,
-    700: 2,
-    500: 1
+    default: 3, // 默认3列
+    1100: 3,    // >1100px 显示3列
+    900: 2,     // >900px 显示2列
+    580: 2,     // >580px 显示2列
+    400: 1      // <400px 显示1列
   };
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-h-[200px]">
-        {Array.from({ length: images.length }).map((_, index) => (
-          <div key={index} className="animate-pulse bg-gray-200 h-64"></div>
-        ))}
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="animate-pulse">加载中...</div>
       </div>
     );
   }
@@ -272,21 +271,26 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
       {/* 瀑布流画廊 */}
       <Masonry
         breakpointCols={breakpointColumnsObj}
-        className="flex w-full gap-4"
-        columnClassName="flex flex-col gap-4"
+        className="flex w-auto"
+        columnClassName="pl-0 md:pl-2 bg-clip-padding"
       >
         {processedImages.map((image, index) => (
-          <div 
-            key={index} 
-            className={`overflow-hidden cursor-pointer`}
+          <div
+            key={index}
+            className="mb-2 sm:mb-3 md:mb-4 px-1 md:px-2 animate-fadeIn"
+            style={{
+              animationDelay: `${index * 0.05}s`,
+              animationDuration: '0.5s'
+            }}
             onClick={() => openLightbox(index)}
           >
-            {/* LazyImage组件用于延迟加载 */}
-            <LazyImage
-              src={image.url}
-              alt={`Gallery image ${index}`}
-              className="w-full h-auto hover:scale-105 transition-transform duration-300"
-            />
+            <div className={`relative overflow-hidden ${!isMobile && 'cursor-pointer'}`}>
+              <LazyImage
+                src={image.url}
+                alt={`Gallery image ${index + 1}`}
+                className="w-full h-auto transition-transform duration-500 hover:scale-105"
+              />
+            </div>
           </div>
         ))}
       </Masonry>

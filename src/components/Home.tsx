@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Gallery from './Gallery';
+import PageLayout from './PageLayout';
 import { generateGalleryImages, preloadImages, GALLERY_CONFIG } from '../utils/imageUtils';
 
 const Home = () => {
@@ -21,9 +22,9 @@ const Home = () => {
   }, [totalImages, folderPath]);
 
   return (
-    <div className="px-6 md:px-48 py-12">
+    <PageLayout>
       <Gallery images={galleryImages} />
-    </div>
+    </PageLayout>
   );
 };
 

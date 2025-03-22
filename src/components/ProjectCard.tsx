@@ -25,9 +25,9 @@ export default function ProjectCard({ project, onClick }: ProjectCardProps) {
         }}
       />
       <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300" />
-      <div className="absolute inset-0 flex flex-col justify-end p-6 text-white">
-        <h3 className="text-xl font-bold mb-2">{project.name}</h3>
-        <p className="text-sm opacity-90">{project.category} • {project.year}</p>
+      <div className="absolute inset-0 flex flex-col justify-end p-2 sm:p-3 md:p-4 text-white">
+        <h3 className="text-base md:text-xl font-bold mb-0.5 md:mb-1">{project.name}</h3>
+        <p className="text-xs md:text-sm opacity-90">{project.category} • {project.year}</p>
       </div>
     </motion.div>
   );

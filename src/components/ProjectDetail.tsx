@@ -14,6 +14,25 @@ const ProjectDetail = () => {
   const project = projects.find(p => p.id === id);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // 检测设备是否为移动设备
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // 小于768px视为移动设备
+    };
+    
+    // 初始检查
+    checkMobile();
+    
+    // 监听窗口大小变化
+    window.addEventListener('resize', checkMobile);
+    
+    // 清理函数
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   if (!project) {
     return (
@@ -38,6 +57,9 @@ const ProjectDetail = () => {
   };
 
   const handleImageClick = (src: string, index: number) => {
+    // 如果是移动设备，不打开灯箱
+    if (isMobile) return;
+    
     setSelectedImage(src);
     setCurrentIndex(index);
   };
@@ -106,7 +128,7 @@ const ProjectDetail = () => {
             }`}
           >
             <div
-              className="relative cursor-pointer"
+              className={`relative ${!isMobile ? 'cursor-pointer' : ''}`}
               onClick={() => handleImageClick(image.src, index)}
             >
               <LazyImage
@@ -119,9 +141,9 @@ const ProjectDetail = () => {
         ))}
       </Masonry>
 
-      {/* Lightbox */}
+      {/* Lightbox - 仅在非移动设备上显示 */}
       <AnimatePresence>
-        {selectedImage && (
+        {selectedImage && !isMobile && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
