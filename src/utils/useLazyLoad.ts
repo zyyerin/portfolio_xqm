@@ -20,8 +20,8 @@ export function useLazyLoad(options: UseLazyLoadOptions = {}) {
       },
       {
         root: options.root,
-        rootMargin: options.rootMargin || '50px',
-        threshold: options.threshold || 0.1,
+        rootMargin: options.rootMargin || '100px',
+        threshold: options.threshold || 0.01,
       }
     );
 
@@ -48,6 +48,7 @@ export interface LazyImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   onLoad?: () => void;
   onError?: () => void;
   fallbackSrc?: string;
+  loading?: 'eager' | 'lazy';
 }
 
 export const LazyImage = React.forwardRef<HTMLImageElement, LazyImageProps>(
@@ -60,6 +61,7 @@ export const LazyImage = React.forwardRef<HTMLImageElement, LazyImageProps>(
       onLoad, 
       onError,
       fallbackSrc,
+      loading = 'lazy',
       ...rest 
     } = props;
     
@@ -102,6 +104,20 @@ export const LazyImage = React.forwardRef<HTMLImageElement, LazyImageProps>(
       return null;
     }
 
+    if (loading === 'lazy') {
+      return React.createElement('img', {
+        ref: combinedRef,
+        src: imgSrc,
+        alt,
+        loading: 'lazy',
+        className: `transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'} ${className}`,
+        onLoad: handleLoad,
+        onError: handleError,
+        decoding: 'async',
+        ...rest
+      });
+    }
+
     return React.createElement('img', {
       ref: combinedRef,
       src: imgSrc,
@@ -109,6 +125,7 @@ export const LazyImage = React.forwardRef<HTMLImageElement, LazyImageProps>(
       className: `transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'} ${className}`,
       onLoad: handleLoad,
       onError: handleError,
+      decoding: 'async',
       ...rest
     });
   }

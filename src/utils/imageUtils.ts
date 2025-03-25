@@ -9,9 +9,18 @@ export const PROJECT_CONFIG = {
 
 // 画廊配置
 export const GALLERY_CONFIG = {
-  maxImages: 100, // 尝试加载的最大图片数量
+  initialBatchSize: 12, // 初始加载的图片数量
+  batchSize: 12,        // 后续每批加载的图片数量
+  maxImages: 100,       // 尝试加载的最大图片数量
   folderPath: 'gallery'
 } as const;
+
+// 图片缓存对象，用于存储已检查过的图片信息
+const imageCache: Record<string, {
+  exists: boolean;
+  dimensions?: { width: number; height: number };
+  aspectRatio?: number;
+}> = {};
 
 /**
  * 获取完整的图片URL
@@ -63,47 +72,101 @@ export interface GalleryImage {
 /**
  * 生成画廊图片数组
  * @param folderPath 文件夹路径
- * @param maxCount 尝试加载的最大图片数量
+ * @param startIndex 起始索引
+ * @param count 图片数量
  */
-export function generateGalleryImages(folderPath: string, maxCount: number = GALLERY_CONFIG.maxImages): GalleryImage[] {
-  return Array.from({ length: maxCount }, (_, index) => ({
-    url: getImageUrl(`${folderPath}/${index + 1}.jpg`),
-    aspectRatio: 4 / 3, // 默认宽高比
-    loaded: false // 初始状态为未加载
-  }));
+export function generateGalleryImages(
+  folderPath: string, 
+  startIndex: number = 1, 
+  count: number = GALLERY_CONFIG.initialBatchSize
+): GalleryImage[] {
+  return Array.from({ length: count }, (_, index) => {
+    const imageIndex = startIndex + index;
+    const url = getImageUrl(`${folderPath}/${imageIndex}.jpg`);
+    
+    // 尝试从缓存获取图片信息
+    if (imageCache[url]) {
+      return {
+        url,
+        aspectRatio: imageCache[url].aspectRatio || 4 / 3,
+        loaded: imageCache[url].exists
+      };
+    }
+    
+    return {
+      url,
+      aspectRatio: 4 / 3, // 默认宽高比
+      loaded: false
+    };
+  });
 }
 
 /**
- * 检测图片是否可以加载
+ * 检测图片是否可以加载并同时获取尺寸
  * @param url 图片URL
  */
-export function checkImageExists(url: string): Promise<boolean> {
+export function checkImageWithDimensions(url: string): Promise<{
+  exists: boolean;
+  dimensions?: { width: number; height: number };
+  aspectRatio?: number;
+}> {
+  // 检查缓存
+  if (imageCache[url]) {
+    return Promise.resolve(imageCache[url]);
+  }
+  
   return new Promise((resolve) => {
     const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
+    
+    img.onload = () => {
+      const dimensions = { 
+        width: img.naturalWidth, 
+        height: img.naturalHeight 
+      };
+      const aspectRatio = img.naturalWidth / img.naturalHeight;
+      const result = { exists: true, dimensions, aspectRatio };
+      
+      // 存入缓存
+      imageCache[url] = result;
+      resolve(result);
+    };
+    
+    img.onerror = () => {
+      const result = { exists: false };
+      
+      // 存入缓存
+      imageCache[url] = result;
+      resolve(result);
+    };
+    
     img.src = url;
   });
 }
 
 /**
- * 批量检测图片并过滤掉不存在的
+ * 批量检测图片并同时获取尺寸
  * @param images 图片数组
  */
-export async function filterValidImages(images: GalleryImage[]): Promise<GalleryImage[]> {
-  const results = await Promise.allSettled(
+export async function processBatchImages(images: GalleryImage[]): Promise<GalleryImage[]> {
+  // 使用Promise.all并行处理所有图片
+  const results = await Promise.all(
     images.map(async (image) => {
-      const exists = await checkImageExists(image.url);
-      return { ...image, loaded: exists };
+      const { exists, aspectRatio } = await checkImageWithDimensions(image.url);
+      return { 
+        ...image, 
+        loaded: exists,
+        aspectRatio: aspectRatio || image.aspectRatio
+      };
     })
   );
   
-  // 过滤出成功加载的图片
-  return results
-    .filter((result): result is PromiseFulfilledResult<GalleryImage & {loaded: boolean}> => 
-      result.status === 'fulfilled' && result.value.loaded === true
-    )
-    .map(result => result.value);
+  // 只返回成功加载的图片
+  return results.filter(image => image.loaded);
+}
+
+// 保留旧的函数以兼容性，但内部使用新的实现
+export async function filterValidImages(images: GalleryImage[]): Promise<GalleryImage[]> {
+  return processBatchImages(images);
 }
 
 /**

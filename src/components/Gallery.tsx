@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { LazyImage } from '../utils/useLazyLoad';
 import Masonry from 'react-masonry-css';
@@ -7,7 +7,7 @@ import {
   GalleryImage, 
   GALLERY_CONFIG, 
   generateGalleryImages, 
-  filterValidImages 
+  processBatchImages 
 } from '../utils/imageUtils';
 
 interface ProcessedGalleryImage extends GalleryImage {
@@ -23,10 +23,15 @@ interface GalleryProps {
 const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPath }) => {
   const [processedImages, setProcessedImages] = useState<ProcessedGalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [allImagesLoaded, setAllImagesLoaded] = useState(false);
+  const [currentBatch, setCurrentBatch] = useState(1);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const folderPathRef = useRef(customFolderPath || GALLERY_CONFIG.folderPath);
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
@@ -35,95 +40,166 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // 处理图片尺寸并添加布局信息
+  const processImagesWithLayout = (images: GalleryImage[]): ProcessedGalleryImage[] => {
+    if (!images || images.length === 0) return [];
+
+    const sortedImages = [...images].sort((a, b) => {
+      const getNumberFromUrl = (url: string) => {
+        const match = url.match(/(\d+)\.jpg$/);
+        return match ? parseInt(match[1]) : 0;
+      };
+      return getNumberFromUrl(b.url) - getNumberFromUrl(a.url);
+    });
+
+    return sortedImages.map((image, index) => {
+      const groupIndex = Math.floor(index / 9);
+      const isHorizontal = image.aspectRatio! > 1;
+      let colSpan = 1, rowSpan = 1;
+
+      if (image.aspectRatio! > 2.5) {
+        colSpan = 3;
+      } else if (isHorizontal) {
+        const groupStart = groupIndex * 9;
+        const groupEnd = Math.min(groupStart + 9, sortedImages.length);
+        const horizontalImagesInGroup = sortedImages
+          .slice(groupStart, groupEnd)
+          .map((img, i) => ({ index: groupStart + i, isHorizontal: img.aspectRatio! > 1 }))
+          .filter(img => img.isHorizontal);
+
+        if (horizontalImagesInGroup.length > 0 && horizontalImagesInGroup[0].index === index) {
+          colSpan = 2;
+        }
+      } else if (image.aspectRatio! < 0.5) {
+        rowSpan = 3;
+      } else if (image.aspectRatio! < 0.7) {
+        rowSpan = 2;
+      }
+
+      return { ...image, colSpan, rowSpan };
+    });
+  };
+
+  // 加载初始图片批次
   useEffect(() => {
-    const loadImages = async () => {
+    const loadInitialBatch = async () => {
       setLoading(true);
       
-      // 如果已提供初始图片，使用它们；否则，动态生成图片列表
-      let imagesToProcess = initialImages;
-      
-      if (!imagesToProcess) {
-        const folderPath = customFolderPath || GALLERY_CONFIG.folderPath;
-        const generatedImages = generateGalleryImages(folderPath);
-        // 过滤掉无法加载的图片
-        const validImages = await filterValidImages(generatedImages);
-        imagesToProcess = validImages;
-      }
-      
-      if (!imagesToProcess || imagesToProcess.length === 0) {
-        console.warn('没有找到有效的图片');
+      // 如果提供了初始图片，直接使用
+      if (initialImages && initialImages.length > 0) {
+        setProcessedImages(processImagesWithLayout(initialImages));
+        setAllImagesLoaded(true);
         setLoading(false);
-        setProcessedImages([]);
         return;
       }
 
-      const loadImageDimensions = async () => {
-        const processed = await Promise.all(
-          imagesToProcess!.map(async (image) => {
-            if (image.aspectRatio) return { ...image, aspectRatio: image.aspectRatio };
-            
-            try {
-              const dimensions = await getImageDimensions(image.url);
-              return { ...image, aspectRatio: dimensions.width / dimensions.height };
-            } catch (error) {
-              console.error('加载图片尺寸失败:', error);
-              return { ...image, aspectRatio: 1 };
-            }
-          })
-        );
-
-        const sortedImages = [...processed].sort((a, b) => {
-          const getNumberFromUrl = (url: string) => {
-            const match = url.match(/(\d+)\.jpg$/);
-            return match ? parseInt(match[1]) : 0;
-          };
-          return getNumberFromUrl(b.url) - getNumberFromUrl(a.url);
-        });
-
-        const processedWithSpans = sortedImages.map((image, index) => {
-          const groupIndex = Math.floor(index / 9);
-          const isHorizontal = image.aspectRatio > 1;
-          let colSpan = 1, rowSpan = 1;
-
-          if (image.aspectRatio > 2.5) {
-            colSpan = 3;
-          } else if (isHorizontal) {
-            const groupStart = groupIndex * 9;
-            const groupEnd = Math.min(groupStart + 9, sortedImages.length);
-            const horizontalImagesInGroup = sortedImages
-              .slice(groupStart, groupEnd)
-              .map((img, i) => ({ index: groupStart + i, isHorizontal: img.aspectRatio > 1 }))
-              .filter(img => img.isHorizontal);
-
-            if (horizontalImagesInGroup.length > 0 && horizontalImagesInGroup[0].index === index) {
-              colSpan = 2;
-            }
-          } else if (image.aspectRatio < 0.5) {
-            rowSpan = 3;
-          } else if (image.aspectRatio < 0.7) {
-            rowSpan = 2;
-          }
-
-          return { ...image, colSpan, rowSpan };
-        });
+      try {
+        const folderPath = customFolderPath || GALLERY_CONFIG.folderPath;
+        folderPathRef.current = folderPath;
         
-        setProcessedImages(processedWithSpans);
+        // 生成初始批次图片
+        const initialBatch = generateGalleryImages(
+          folderPath, 
+          1, 
+          GALLERY_CONFIG.initialBatchSize
+        );
+        
+        // 过滤和处理图片
+        const validImages = await processBatchImages(initialBatch);
+        
+        if (validImages.length > 0) {
+          setProcessedImages(processImagesWithLayout(validImages));
+          setCurrentBatch(2); // 设置下一批次索引
+          
+          // 如果获取的有效图片数量小于请求的数量，表示已经加载完所有图片
+          if (validImages.length < GALLERY_CONFIG.initialBatchSize) {
+            setAllImagesLoaded(true);
+          }
+        } else {
+          setAllImagesLoaded(true);
+        }
+      } catch (error) {
+        console.error('加载图片失败:', error);
+      } finally {
         setLoading(false);
-      };
-      
-      loadImageDimensions();
+      }
     };
-    
-    loadImages();
+
+    loadInitialBatch();
   }, [initialImages, customFolderPath]);
 
-  const getImageDimensions = (url: string): Promise<{width: number, height: number}> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-      img.onerror = reject;
-      img.src = url;
-    });
+  // 监听滚动以加载更多图片
+  useEffect(() => {
+    if (allImagesLoaded || loading || loadingMore || !galleryRef.current) return;
+
+    const handleScroll = () => {
+      if (loadingMore || allImagesLoaded) return;
+
+      const galleryBottom = galleryRef.current?.getBoundingClientRect().bottom || 0;
+      const windowHeight = window.innerHeight;
+      
+      // 当滚动到画廊底部附近时加载更多图片
+      if (galleryBottom - windowHeight < 500) {
+        loadMoreImages();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, [loading, loadingMore, allImagesLoaded, processedImages]);
+
+  // 加载更多图片的函数
+  const loadMoreImages = async () => {
+    if (loadingMore || allImagesLoaded) return;
+    
+    setLoadingMore(true);
+    
+    try {
+      // 计算下一批次的起始索引
+      const startIndex = (currentBatch - 1) * GALLERY_CONFIG.batchSize + 1;
+      
+      // 生成下一批次图片
+      const nextBatch = generateGalleryImages(
+        folderPathRef.current, 
+        startIndex, 
+        GALLERY_CONFIG.batchSize
+      );
+      
+      // 过滤和处理图片
+      const validImages = await processBatchImages(nextBatch);
+      
+      if (validImages.length > 0) {
+        // 将新图片与现有图片合并，并进行布局处理
+        setProcessedImages(prevImages => {
+          const combinedImages = [...prevImages, ...processImagesWithLayout(validImages)];
+          
+          // 排序（如果需要）
+          return combinedImages.sort((a, b) => {
+            const getNumberFromUrl = (url: string) => {
+              const match = url.match(/(\d+)\.jpg$/);
+              return match ? parseInt(match[1]) : 0;
+            };
+            return getNumberFromUrl(b.url) - getNumberFromUrl(a.url);
+          });
+        });
+        
+        setCurrentBatch(prev => prev + 1);
+        
+        // 如果获取的有效图片数量小于请求的数量，表示已经加载完所有图片
+        if (validImages.length < GALLERY_CONFIG.batchSize) {
+          setAllImagesLoaded(true);
+        }
+      } else {
+        setAllImagesLoaded(true);
+      }
+    } catch (error) {
+      console.error('加载更多图片失败:', error);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const openLightbox = (index: number) => {
@@ -201,7 +277,7 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
   if (loading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="animate-pulse">加载中...</div>
+        <div className="animate-pulse">loading...</div>
       </div>
     );
   }
@@ -209,13 +285,13 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
   if (processedImages.length === 0) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="text-gray-500">没有找到图片</div>
+        <div className="text-gray-500">image not found</div>
       </div>
     );
   }
 
   return (
-    <>
+    <div ref={galleryRef}>
       <Masonry
         breakpointCols={breakpointColumnsObj}
         className="flex w-auto -ml-2 sm:-ml-3 md:-ml-4"
@@ -223,7 +299,7 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
       >
         {processedImages.map((image, index) => (
           <div
-            key={index}
+            key={image.url}
             className="mb-2 sm:mb-3 md:mb-4 animate-fadeIn"
             style={{
               animationDelay: `${index * 0.05}s`,
@@ -236,12 +312,24 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
                 src={image.url}
                 alt={`Gallery image ${index + 1}`}
                 className="w-full h-auto transition-transform duration-500 hover:scale-105"
+                loading="lazy"
               />
             </div>
           </div>
         ))}
       </Masonry>
-      <div className="pb-8 mb-4"></div>
+      
+      {loadingMore && (
+        <div className="py-8 flex justify-center">
+          <div className="animate-pulse">加载更多图片中...</div>
+        </div>
+      )}
+      
+      {allImagesLoaded && processedImages.length > 0 && (
+        <div className="py-8 flex justify-center">
+          <div className="text-gray-500">已加载全部图片</div>
+        </div>
+      )}
 
       <AnimatePresence>
         {lightboxOpen && (
@@ -283,7 +371,7 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 };
 

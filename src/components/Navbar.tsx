@@ -117,13 +117,13 @@ const Navbar = () => {
             GALLERY
           </Link>
           
-          <Link 
+          {/* <Link 
             to="/projects" 
             className="text-lg text-gray-900 tracking-wide hover:opacity-70 transition-opacity px-4 py-2 inline-block"
             onClick={() => setIsMenuOpen(false)}
           >
             PROJECTS
-          </Link>
+          </Link> */}
           
           <Link 
             to="/about" 
