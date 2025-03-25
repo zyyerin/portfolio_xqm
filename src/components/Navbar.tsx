@@ -79,9 +79,9 @@ const Navbar = () => {
             <Link to="/" className="text-sm tracking-wide hover:opacity-70 transition-opacity py-2">
               GALLERY
             </Link>
-            <Link to="/projects" className="text-sm tracking-wide hover:opacity-70 transition-opacity py-2">
+            {/* <Link to="/projects" className="text-sm tracking-wide hover:opacity-70 transition-opacity py-2">
               PROJECTS
-            </Link>
+            </Link> */}
             <Link to="/about" className="text-sm tracking-wide hover:opacity-70 transition-opacity py-2">
               ABOUT
             </Link>

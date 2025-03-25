@@ -3,11 +3,12 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { LazyImage } from '../utils/useLazyLoad';
 import Masonry from 'react-masonry-css';
 import { motion, AnimatePresence } from 'framer-motion';
-
-interface GalleryImage {
-  url: string;
-  aspectRatio?: number; // 可选的宽高比属性，如果预先知道的话
-}
+import { 
+  GalleryImage, 
+  GALLERY_CONFIG, 
+  generateGalleryImages, 
+  filterValidImages 
+} from '../utils/imageUtils';
 
 interface ProcessedGalleryImage extends GalleryImage {
   colSpan: number;
@@ -15,247 +16,186 @@ interface ProcessedGalleryImage extends GalleryImage {
 }
 
 interface GalleryProps {
-  images: GalleryImage[];
+  images?: GalleryImage[];
+  customFolderPath?: string;
 }
 
-const Gallery: React.FC<GalleryProps> = ({ images }) => {
-  const [processedImages, setProcessedImages] = useState<GalleryImage[]>([]);
+const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPath }) => {
+  const [processedImages, setProcessedImages] = useState<ProcessedGalleryImage[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // 灯箱状态
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // 检测设备是否为移动设备
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768); // 小于768px视为移动设备
-    };
-    
-    // 初始检查
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
-    
-    // 监听窗口大小变化
     window.addEventListener('resize', checkMobile);
-    
-    // 清理函数
-    return () => {
-      window.removeEventListener('resize', checkMobile);
-    };
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // 预加载图片并计算比例
   useEffect(() => {
-    const loadImageDimensions = async () => {
-      const processed = await Promise.all(
-        images.map(async (image) => {
-          if (image.aspectRatio) {
-            return image;
-          }
-          
-          try {
-            const dimensions = await getImageDimensions(image.url);
-            return {
-              ...image,
-              aspectRatio: dimensions.width / dimensions.height
-            };
-          } catch (error) {
-            console.error('Failed to load image dimensions:', error);
-            return {
-              ...image,
-              aspectRatio: 1
-            };
-          }
-        })
-      );
+    const loadImages = async () => {
+      setLoading(true);
       
-      setProcessedImages(processed);
-      setLoading(false);
+      // 如果已提供初始图片，使用它们；否则，动态生成图片列表
+      let imagesToProcess = initialImages;
+      
+      if (!imagesToProcess) {
+        const folderPath = customFolderPath || GALLERY_CONFIG.folderPath;
+        const generatedImages = generateGalleryImages(folderPath);
+        // 过滤掉无法加载的图片
+        const validImages = await filterValidImages(generatedImages);
+        imagesToProcess = validImages;
+      }
+      
+      if (!imagesToProcess || imagesToProcess.length === 0) {
+        console.warn('没有找到有效的图片');
+        setLoading(false);
+        setProcessedImages([]);
+        return;
+      }
+
+      const loadImageDimensions = async () => {
+        const processed = await Promise.all(
+          imagesToProcess!.map(async (image) => {
+            if (image.aspectRatio) return { ...image, aspectRatio: image.aspectRatio };
+            
+            try {
+              const dimensions = await getImageDimensions(image.url);
+              return { ...image, aspectRatio: dimensions.width / dimensions.height };
+            } catch (error) {
+              console.error('加载图片尺寸失败:', error);
+              return { ...image, aspectRatio: 1 };
+            }
+          })
+        );
+
+        const sortedImages = [...processed].sort((a, b) => {
+          const getNumberFromUrl = (url: string) => {
+            const match = url.match(/(\d+)\.jpg$/);
+            return match ? parseInt(match[1]) : 0;
+          };
+          return getNumberFromUrl(b.url) - getNumberFromUrl(a.url);
+        });
+
+        const processedWithSpans = sortedImages.map((image, index) => {
+          const groupIndex = Math.floor(index / 9);
+          const isHorizontal = image.aspectRatio > 1;
+          let colSpan = 1, rowSpan = 1;
+
+          if (image.aspectRatio > 2.5) {
+            colSpan = 3;
+          } else if (isHorizontal) {
+            const groupStart = groupIndex * 9;
+            const groupEnd = Math.min(groupStart + 9, sortedImages.length);
+            const horizontalImagesInGroup = sortedImages
+              .slice(groupStart, groupEnd)
+              .map((img, i) => ({ index: groupStart + i, isHorizontal: img.aspectRatio > 1 }))
+              .filter(img => img.isHorizontal);
+
+            if (horizontalImagesInGroup.length > 0 && horizontalImagesInGroup[0].index === index) {
+              colSpan = 2;
+            }
+          } else if (image.aspectRatio < 0.5) {
+            rowSpan = 3;
+          } else if (image.aspectRatio < 0.7) {
+            rowSpan = 2;
+          }
+
+          return { ...image, colSpan, rowSpan };
+        });
+        
+        setProcessedImages(processedWithSpans);
+        setLoading(false);
+      };
+      
+      loadImageDimensions();
     };
     
-    if (images.length > 0) {
-      loadImageDimensions();
-    }
-  }, [images]);
+    loadImages();
+  }, [initialImages, customFolderPath]);
 
-  // 获取图片尺寸
   const getImageDimensions = (url: string): Promise<{width: number, height: number}> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.onload = () => {
-        resolve({
-          width: img.naturalWidth,
-          height: img.naturalHeight
-        });
-      };
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
       img.onerror = reject;
       img.src = url;
     });
   };
 
-  // 根据图片比例计算跨度
-  const getImageSpans = (image: GalleryImage, aspectRatio: number): ProcessedGalleryImage => {
-    let colSpan = 1;
-    let rowSpan = 1;
-    
-    // 更细致的宽高比分类
-    if (aspectRatio > 2.5) {  // 超宽图片
-      colSpan = 3;
-      rowSpan = 1;
-    } else if (aspectRatio > 1.7) {  // 宽图
-      colSpan = 2;
-      rowSpan = 1;
-    } else if (aspectRatio < 0.5) {  // 超高图片
-      colSpan = 1;
-      rowSpan = 3;
-    } else if (aspectRatio < 0.7) {  // 高图
-      colSpan = 1;
-      rowSpan = 2;
-    } else if (aspectRatio >= 0.9 && aspectRatio <= 1.1) {  // 接近正方形
-      // 随机决定一些正方形图片占据2x2或2x1，增加视觉多样性
-      if (Math.random() > 0.8) {
-        colSpan = 2;
-        rowSpan = 2;
-      } else if (Math.random() > 0.6) {
-        colSpan = 2;
-        rowSpan = 1;
-      }
-    }
-    
-    return {
-      ...image,
-      aspectRatio,
-      colSpan,
-      rowSpan
-    };
-  };
-
-  // 打开灯箱 - 仅在非移动设备上启用
   const openLightbox = (index: number) => {
-    // 如果是移动设备，不打开灯箱
     if (isMobile) return;
-    
     setCurrentImageIndex(index);
     setLightboxOpen(true);
-    document.body.style.overflow = 'hidden'; // 防止背景滚动
+    document.body.style.overflow = 'hidden';
   };
 
-  // 关闭灯箱
   const closeLightbox = () => {
     setLightboxOpen(false);
-    document.body.style.overflow = 'auto'; // 恢复背景滚动
+    document.body.style.overflow = 'auto';
   };
 
-  // 导航到上一张/下一张图片
   const goToPreviousImage = () => {
     if (isAnimating) return;
-    
     setIsAnimating(true);
     setCurrentImageIndex((prevIndex) => 
-      prevIndex === 0 ? images.length - 1 : prevIndex - 1
+      prevIndex === 0 ? processedImages.length - 1 : prevIndex - 1
     );
-    
-    // 动画结束后重置状态
-    setTimeout(() => {
-      setIsAnimating(false);
-    }, 300);
+    setTimeout(() => setIsAnimating(false), 300);
   };
 
   const goToNextImage = () => {
     if (isAnimating) return;
-    
     setIsAnimating(true);
     setCurrentImageIndex((prevIndex) => 
-      prevIndex === images.length - 1 ? 0 : prevIndex + 1
+      prevIndex === processedImages.length - 1 ? 0 : prevIndex + 1
     );
-    
-    // 动画结束后重置状态
-    setTimeout(() => {
-      setIsAnimating(false);
-    }, 300);
+    setTimeout(() => setIsAnimating(false), 300);
   };
 
-  // 处理键盘事件
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!lightboxOpen) return;
-
     switch (e.key) {
-      case 'ArrowLeft':
-        goToPreviousImage();
-        break;
-      case 'ArrowRight':
-        goToNextImage();
-        break;
-      case 'Escape':
-        closeLightbox();
-        break;
-      default:
-        break;
+      case 'ArrowLeft': goToPreviousImage(); break;
+      case 'ArrowRight': goToNextImage(); break;
+      case 'Escape': closeLightbox(); break;
     }
   }, [lightboxOpen, isAnimating]);
 
-  // 添加/移除键盘事件监听器
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // 添加CSS动画样式到头部
   useEffect(() => {
-    // 创建style元素
     const styleElement = document.createElement('style');
     styleElement.textContent = `
       @keyframes fadeIn {
-        from { 
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to { 
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
       }
       
       @keyframes fadeInImage {
-        0% { 
-          opacity: 0;
-          transform: scale(0.95);
-        }
-        100% { 
-          opacity: 1;
-          transform: scale(1);
-        }
+        0% { opacity: 0; transform: scale(0.95); }
+        100% { opacity: 1; transform: scale(1); }
       }
       
-      .lightbox-container {
-        animation: fadeIn 0.3s ease-in-out forwards;
-      }
-      
-      .lightbox-image {
-        animation: fadeInImage 0.3s ease-in-out;
-      }
+      .lightbox-container { animation: fadeIn 0.3s ease-in-out forwards; }
+      .lightbox-image { animation: fadeInImage 0.3s ease-in-out; }
     `;
-    
-    // 将style添加到头部
     document.head.appendChild(styleElement);
-    
-    // 清理函数
-    return () => {
-      document.head.removeChild(styleElement);
-    };
+    return () => { document.head.removeChild(styleElement); };
   }, []);
 
-  // Masonry布局配置和断点 - 调整以适应不同屏幕大小
   const breakpointColumnsObj = {
-    default: 3, // 默认3列
-    1100: 3,    // >1100px 显示3列
-    900: 2,     // >900px 显示2列
-    580: 2,     // >580px 显示2列
-    400: 1      // <400px 显示1列
+    default: 3,
+    1100: 3,
+    900: 2,
+    580: 2,
+    400: 1
   };
 
   if (loading) {
@@ -266,9 +206,16 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
     );
   }
 
+  if (processedImages.length === 0) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center">
+        <div className="text-gray-500">没有找到图片</div>
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* 瀑布流画廊 */}
       <Masonry
         breakpointCols={breakpointColumnsObj}
         className="flex w-auto -ml-2 sm:-ml-3 md:-ml-4"
@@ -294,8 +241,8 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
           </div>
         ))}
       </Masonry>
+      <div className="pb-8 mb-4"></div>
 
-      {/* 灯箱组件 */}
       <AnimatePresence>
         {lightboxOpen && (
           <motion.div
@@ -305,42 +252,30 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
             className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center"
             onClick={closeLightbox}
           >
-            {/* 灯箱关闭按钮 */}
-            <button 
-              className="absolute top-4 right-4 text-white p-2 z-10"
-              onClick={closeLightbox}
-            >
+            <button className="absolute top-4 right-4 text-white p-2 z-10" onClick={closeLightbox}>
               <X size={24} />
             </button>
             
-            {/* 导航按钮 */}
             <button 
               className="absolute left-4 text-white p-2 z-10"
-              onClick={(e) => {
-                e.stopPropagation();
-                goToPreviousImage();
-              }}
+              onClick={(e) => { e.stopPropagation(); goToPreviousImage(); }}
             >
               <ChevronLeft size={40} />
             </button>
             
             <button 
               className="absolute right-4 text-white p-2 z-10"
-              onClick={(e) => {
-                e.stopPropagation();
-                goToNextImage();
-              }}
+              onClick={(e) => { e.stopPropagation(); goToNextImage(); }}
             >
               <ChevronRight size={40} />
             </button>
             
-            {/* 灯箱图片 */}
             <div 
               className="relative w-full h-full flex items-center justify-center p-4 md:p-10"
               onClick={(e) => e.stopPropagation()}
             >
               <img 
-                src={images[currentImageIndex].url} 
+                src={processedImages[currentImageIndex].url} 
                 alt={`Lightbox image ${currentImageIndex}`}
                 className="max-w-full max-h-full object-contain"
               />
@@ -352,19 +287,8 @@ const Gallery: React.FC<GalleryProps> = ({ images }) => {
   );
 };
 
-// 默认属性
 Gallery.defaultProps = {
-  images: [
-    {
-      url: "https://erinzy-1258568418.cos.ap-shanghai.myqcloud.com/portfolio_xqm/test/1.jpg"
-    },
-    {
-      url: "https://erinzy-1258568418.cos.ap-shanghai.myqcloud.com/portfolio_xqm/test/2.jpg"
-    },
-    {
-      url: "https://erinzy-1258568418.cos.ap-shanghai.myqcloud.com/portfolio_xqm/test/3.jpg"
-    }
-  ]
+  customFolderPath: GALLERY_CONFIG.folderPath
 };
 
 export default Gallery;

@@ -46,12 +46,49 @@ export interface LazyImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   placeholder?: string;
   className?: string;
   onLoad?: () => void;
+  onError?: () => void;
+  fallbackSrc?: string;
 }
 
 export const LazyImage = React.forwardRef<HTMLImageElement, LazyImageProps>(
   (props, ref) => {
-    const { src, alt, placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', className = '', onLoad, ...rest } = props;
+    const { 
+      src, 
+      alt, 
+      placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 
+      className = '', 
+      onLoad, 
+      onError,
+      fallbackSrc,
+      ...rest 
+    } = props;
+    
     const { elementRef, isVisible } = useLazyLoad();
+    const [imgSrc, setImgSrc] = useState<string>(isVisible ? src : placeholder);
+    const [hasError, setHasError] = useState<boolean>(false);
+    
+    useEffect(() => {
+      if (isVisible) {
+        setImgSrc(src);
+      }
+    }, [isVisible, src]);
+    
+    const handleError = () => {
+      setHasError(true);
+      if (fallbackSrc) {
+        setImgSrc(fallbackSrc);
+      }
+      if (onError) {
+        onError();
+      }
+    };
+    
+    const handleLoad = () => {
+      if (onLoad) {
+        onLoad();
+      }
+    };
+    
     const combinedRef = (node: HTMLImageElement | null) => {
       if (typeof ref === 'function') {
         ref(node);
@@ -61,12 +98,17 @@ export const LazyImage = React.forwardRef<HTMLImageElement, LazyImageProps>(
       elementRef.current = node;
     };
 
+    if (hasError && !fallbackSrc) {
+      return null;
+    }
+
     return React.createElement('img', {
       ref: combinedRef,
-      src: isVisible ? src : placeholder,
+      src: imgSrc,
       alt,
       className: `transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'} ${className}`,
-      onLoad,
+      onLoad: handleLoad,
+      onError: handleError,
       ...rest
     });
   }

@@ -9,7 +9,7 @@ export const PROJECT_CONFIG = {
 
 // 画廊配置
 export const GALLERY_CONFIG = {
-  totalImages: 12,
+  maxImages: 100, // 尝试加载的最大图片数量
   folderPath: 'gallery'
 } as const;
 
@@ -57,18 +57,53 @@ export function getAllProjectImages(projectId: string | number, imageCount: numb
 export interface GalleryImage {
   url: string;
   aspectRatio?: number;
+  loaded?: boolean; // 标记图片是否成功加载
 }
 
 /**
  * 生成画廊图片数组
- * @param count 图片数量
  * @param folderPath 文件夹路径
+ * @param maxCount 尝试加载的最大图片数量
  */
-export function generateGalleryImages(count: number, folderPath: string): GalleryImage[] {
-  return Array.from({ length: count }, (_, index) => ({
+export function generateGalleryImages(folderPath: string, maxCount: number = GALLERY_CONFIG.maxImages): GalleryImage[] {
+  return Array.from({ length: maxCount }, (_, index) => ({
     url: getImageUrl(`${folderPath}/${index + 1}.jpg`),
-    aspectRatio: 4 / 3 // 默认宽高比
+    aspectRatio: 4 / 3, // 默认宽高比
+    loaded: false // 初始状态为未加载
   }));
+}
+
+/**
+ * 检测图片是否可以加载
+ * @param url 图片URL
+ */
+export function checkImageExists(url: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+}
+
+/**
+ * 批量检测图片并过滤掉不存在的
+ * @param images 图片数组
+ */
+export async function filterValidImages(images: GalleryImage[]): Promise<GalleryImage[]> {
+  const results = await Promise.allSettled(
+    images.map(async (image) => {
+      const exists = await checkImageExists(image.url);
+      return { ...image, loaded: exists };
+    })
+  );
+  
+  // 过滤出成功加载的图片
+  return results
+    .filter((result): result is PromiseFulfilledResult<GalleryImage & {loaded: boolean}> => 
+      result.status === 'fulfilled' && result.value.loaded === true
+    )
+    .map(result => result.value);
 }
 
 /**
