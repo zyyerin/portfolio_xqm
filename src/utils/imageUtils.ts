@@ -1,21 +1,21 @@
-// 基础URL
+// Base URL
 export const BASE_URL = 'https://erinzy-1258568418.cos.ap-shanghai.myqcloud.com/portfolio_xqm';
 
-// 项目图片配置
+// Project image configuration
 export const PROJECT_CONFIG = {
   COVER_IMAGE: '0.jpg',
   BASE_PATH: 'projects'
 } as const;
 
-// 画廊配置
+// Gallery configuration
 export const GALLERY_CONFIG = {
-  initialBatchSize: 12, // 初始加载的图片数量
-  batchSize: 12,        // 后续每批加载的图片数量
-  maxImages: 100,       // 尝试加载的最大图片数量
+  initialBatchSize: 12, // Initial batch size
+  batchSize: 12,        // Subsequent batch size
+  maxImages: 100,       // Maximum number of images to try loading
   folderPath: 'gallery'
 } as const;
 
-// 图片缓存对象，用于存储已检查过的图片信息
+// Image cache object for storing checked image information
 const imageCache: Record<string, {
   exists: boolean;
   dimensions?: { width: number; height: number };
@@ -23,8 +23,8 @@ const imageCache: Record<string, {
 }> = {};
 
 /**
- * 获取完整的图片URL
- * @param path 图片路径，如果以/开头，会自动移除
+ * Get complete image URL
+ * @param path Image path, if starts with /, it will be removed
  */
 export function getImageUrl(path: string): string {
   const cleanPath = path.startsWith('/') ? path.slice(1) : path;
@@ -32,17 +32,17 @@ export function getImageUrl(path: string): string {
 }
 
 /**
- * 获取项目封面图片URL
- * @param projectId 项目ID或名称（文件夹名）
+ * Get project cover image URL
+ * @param projectId Project ID or name (folder name)
  */
 export function getProjectCoverUrl(projectId: string | number): string {
   return getImageUrl(`${PROJECT_CONFIG.BASE_PATH}/${projectId}/${PROJECT_CONFIG.COVER_IMAGE}`);
 }
 
 /**
- * 获取项目图片URL列表
- * @param projectId 项目ID或名称（文件夹名）
- * @param imageCount 图片数量
+ * Get project image URL list
+ * @param projectId Project ID or name (folder name)
+ * @param imageCount Number of images
  */
 export function getProjectImageUrls(projectId: string | number, imageCount: number): string[] {
   return Array.from({ length: imageCount }, (_, index) => 
@@ -51,9 +51,9 @@ export function getProjectImageUrls(projectId: string | number, imageCount: numb
 }
 
 /**
- * 生成完整的项目图片列表（包括封面）
- * @param projectId 项目ID或名称（文件夹名）
- * @param imageCount 除封面外的图片数量
+ * Generate complete project image list (including cover)
+ * @param projectId Project ID or name (folder name)
+ * @param imageCount Number of images excluding cover
  */
 export function getAllProjectImages(projectId: string | number, imageCount: number): string[] {
   return [
@@ -62,18 +62,18 @@ export function getAllProjectImages(projectId: string | number, imageCount: numb
   ];
 }
 
-// 图片接口定义
+// Image interface definition
 export interface GalleryImage {
   url: string;
   aspectRatio?: number;
-  loaded?: boolean; // 标记图片是否成功加载
+  loaded?: boolean; // Flag indicating if image loaded successfully
 }
 
 /**
- * 生成画廊图片数组
- * @param folderPath 文件夹路径
- * @param startIndex 起始索引
- * @param count 图片数量
+ * Generate gallery images array
+ * @param folderPath Folder path
+ * @param startIndex Start index
+ * @param count Number of images
  */
 export function generateGalleryImages(
   folderPath: string, 
@@ -84,7 +84,7 @@ export function generateGalleryImages(
     const imageIndex = startIndex + index;
     const url = getImageUrl(`${folderPath}/${imageIndex}.jpg`);
     
-    // 尝试从缓存获取图片信息
+    // Try to get image information from cache
     if (imageCache[url]) {
       return {
         url,
@@ -95,22 +95,22 @@ export function generateGalleryImages(
     
     return {
       url,
-      aspectRatio: 4 / 3, // 默认宽高比
+      aspectRatio: 4 / 3, // Default aspect ratio
       loaded: false
     };
   });
 }
 
 /**
- * 检测图片是否可以加载并同时获取尺寸
- * @param url 图片URL
+ * Check if image can be loaded and get dimensions
+ * @param url Image URL
  */
 export function checkImageWithDimensions(url: string): Promise<{
   exists: boolean;
   dimensions?: { width: number; height: number };
   aspectRatio?: number;
 }> {
-  // 检查缓存
+  // Check cache
   if (imageCache[url]) {
     return Promise.resolve(imageCache[url]);
   }
@@ -126,7 +126,7 @@ export function checkImageWithDimensions(url: string): Promise<{
       const aspectRatio = img.naturalWidth / img.naturalHeight;
       const result = { exists: true, dimensions, aspectRatio };
       
-      // 存入缓存
+      // Store in cache
       imageCache[url] = result;
       resolve(result);
     };
@@ -134,7 +134,7 @@ export function checkImageWithDimensions(url: string): Promise<{
     img.onerror = () => {
       const result = { exists: false };
       
-      // 存入缓存
+      // Store in cache
       imageCache[url] = result;
       resolve(result);
     };
@@ -144,11 +144,11 @@ export function checkImageWithDimensions(url: string): Promise<{
 }
 
 /**
- * 批量检测图片并同时获取尺寸
- * @param images 图片数组
+ * Batch check images and get dimensions
+ * @param images Image array
  */
 export async function processBatchImages(images: GalleryImage[]): Promise<GalleryImage[]> {
-  // 使用Promise.all并行处理所有图片
+  // Process all images in parallel using Promise.all
   const results = await Promise.all(
     images.map(async (image) => {
       const { exists, aspectRatio } = await checkImageWithDimensions(image.url);
@@ -160,18 +160,18 @@ export async function processBatchImages(images: GalleryImage[]): Promise<Galler
     })
   );
   
-  // 只返回成功加载的图片
+  // Only return successfully loaded images
   return results.filter(image => image.loaded);
 }
 
-// 保留旧的函数以兼容性，但内部使用新的实现
+// Keep old function for compatibility, but use new implementation internally
 export async function filterValidImages(images: GalleryImage[]): Promise<GalleryImage[]> {
   return processBatchImages(images);
 }
 
 /**
- * 预加载单张图片
- * @param url 图片URL
+ * Preload single image
+ * @param url Image URL
  */
 export function preloadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -183,8 +183,8 @@ export function preloadImage(url: string): Promise<HTMLImageElement> {
 }
 
 /**
- * 批量预加载图片
- * @param urls 图片URL数组
+ * Batch preload images
+ * @param urls Image URL array
  */
 export function preloadImages(urls: string[]): Promise<HTMLImageElement[]> {
   return Promise.all(urls.map(url => preloadImage(url)));

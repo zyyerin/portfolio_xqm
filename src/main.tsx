@@ -3,14 +3,14 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
-// 用于处理GitHub Pages上的SPA路由
+// For handling SPA routing on GitHub Pages
 const processGitHubPagesUrl = () => {
   const query = window.location.search;
   const urlParams = new URLSearchParams(query);
   const pathname = urlParams.get('p');
   
   if (pathname) {
-    // 从URL参数中移除p参数
+    // Remove p parameter from URL
     urlParams.delete('p');
     
     const newSearch = urlParams.toString();
@@ -19,15 +19,15 @@ const processGitHubPagesUrl = () => {
       (newSearch ? `?${newSearch}` : '') + 
       window.location.hash;
     
-    // 使用replaceState更新URL
+    // Update URL using replaceState
     window.history.replaceState(null, '', newUrl);
   }
 };
 
-// 页面加载时处理GitHub Pages路由
+// Process GitHub Pages routing on page load
 processGitHubPagesUrl();
 
-// 记录环境变量 - 用于调试
+// Log environment variables - for debugging
 console.log('BASE_URL:', import.meta.env.BASE_URL);
 console.log('VITE_BASE_URL:', import.meta.env.VITE_BASE_URL);
 console.log('NODE_ENV:', import.meta.env.MODE);

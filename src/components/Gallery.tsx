@@ -49,6 +49,7 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
         const match = url.match(/(\d+)\.jpg$/);
         return match ? parseInt(match[1]) : 0;
       };
+      // 恢复为倒序排列 (b - a)，让大编号图片优先显示
       return getNumberFromUrl(b.url) - getNumberFromUrl(a.url);
     });
 
@@ -119,7 +120,7 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
           setAllImagesLoaded(true);
         }
       } catch (error) {
-        console.error('加载图片失败:', error);
+        console.error('Loading images failed:', error);
       } finally {
         setLoading(false);
       }
@@ -176,12 +177,13 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
         setProcessedImages(prevImages => {
           const combinedImages = [...prevImages, ...processImagesWithLayout(validImages)];
           
-          // 排序（如果需要）
+          // 排序为倒序，让大编号图片优先显示
           return combinedImages.sort((a, b) => {
             const getNumberFromUrl = (url: string) => {
               const match = url.match(/(\d+)\.jpg$/);
               return match ? parseInt(match[1]) : 0;
             };
+            // 倒序排列 (b - a)
             return getNumberFromUrl(b.url) - getNumberFromUrl(a.url);
           });
         });
@@ -196,7 +198,7 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
         setAllImagesLoaded(true);
       }
     } catch (error) {
-      console.error('加载更多图片失败:', error);
+      console.error('Loading more images failed:', error);
     } finally {
       setLoadingMore(false);
     }
@@ -277,7 +279,7 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
   if (loading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="animate-pulse">loading...</div>
+        <div className="animate-pulse">Loading...</div>
       </div>
     );
   }
@@ -285,7 +287,7 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
   if (processedImages.length === 0) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="text-gray-500">image not found</div>
+        <div className="text-gray-500">No images found</div>
       </div>
     );
   }
@@ -321,13 +323,13 @@ const Gallery: React.FC<GalleryProps> = ({ images: initialImages, customFolderPa
       
       {loadingMore && (
         <div className="py-8 flex justify-center">
-          <div className="animate-pulse">加载更多图片中...</div>
+          <div className="animate-pulse">Loading more images...</div>
         </div>
       )}
       
       {allImagesLoaded && processedImages.length > 0 && (
         <div className="py-8 flex justify-center">
-          <div className="text-gray-500">已加载全部图片</div>
+          <div className="text-gray-500">All images loaded</div>
         </div>
       )}
 

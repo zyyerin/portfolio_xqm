@@ -2,16 +2,16 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>重定向中...</title>
+  <title>Redirecting...</title>
   <script>
-    // 仓库名称应与 vite.config.ts 中的 base 保持一致
-    var segmentCount = 1; // 如果是用户页面使用 0
-    var repoName = "portfolio_xqm"; // 你的仓库名称
+    // Repository name should match the base in vite.config.ts
+    var segmentCount = 1; // Use 0 for user page
+    var repoName = "portfolio_xqm"; // Your repository name
     
     var l = window.location;
     var basePath = l.pathname.split('/').slice(0, 1 + segmentCount).join('/') + '/';
     
-    // 重定向到index.html，并保留查询参数和哈希
+    // Redirect to index.html, preserving query parameters and hash
     l.replace(
       l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
       basePath +
@@ -23,6 +23,6 @@
   </script>
 </head>
 <body>
-  <p>页面加载中...</p>
+  <p>Loading page...</p>
 </body>
 </html> 
